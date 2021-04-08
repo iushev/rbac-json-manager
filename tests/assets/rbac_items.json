@@ -1,0 +1,51 @@
+{
+  "createPost": {
+    "type": "permission",
+    "name": "createPost",
+    "description": "",
+    "ruleName": null,
+    "children": []
+  },
+  "readPost": {
+    "type": "permission",
+    "name": "readPost",
+    "description": "",
+    "ruleName": null,
+    "children": []
+  },
+  "updatePost": {
+    "type": "permission",
+    "name": "updatePost",
+    "description": "",
+    "ruleName": null,
+    "children": []
+  },
+  "updateOwnPost": {
+    "type": "permission",
+    "name": "updateOwnPost",
+    "description": "",
+    "ruleName": "isAuthor",
+    "children": ["updatePost"]
+  },
+  "reader": {
+    "type": "role",
+    "name": "reader",
+    "description": "",
+    "ruleName": null,
+    "children": ["readPost"]
+  },
+  "author": {
+    "type": "role",
+    "name": "author",
+    "description": "",
+    "ruleName": null,
+    "children": ["reader", "updateOwnPost", "createPost"]
+  },
+  "admin": {
+    "type": "role",
+    "name": "admin",
+    "description": "",
+    "ruleName": null,
+    "children": ["author", "updatePost"]
+  }
+}

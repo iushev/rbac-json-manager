@@ -1,0 +1,9 @@
+{
+  "isAuthor": {
+    "name": "isAuthor",
+    "data": {
+      "typeName": "AuthorRule",
+      "rule": "{\"name\":\"isAuthor\",\"data\":{}}"
+    }
+  }
+}
