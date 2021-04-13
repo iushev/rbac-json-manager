@@ -19,7 +19,7 @@
     "typescript": "^4.2.4"
   },
   "dependencies": {
-    "@iushev/rbac": "^1.0.14"
+    "@iushev/rbac": "^1.0.15"
   },
   "publishConfig": {
     "access": "public"
