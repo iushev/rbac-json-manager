@@ -1,8 +1,8 @@
 import fs from "fs/promises";
-import { Role, Permission, Item, ItemType, Rule, Assignment, BaseManager, BaseManagerOptions } from "@iushev/rbac";
+import { Role, Permission, IItem, ItemType, Rule, Assignment, BaseManager, BaseManagerOptions } from "@iushev/rbac";
 
 export interface RbacData {
-  items: { [key: string]: Item };
+  items: { [key: string]: IItem };
   rules: { [key: string]: Rule };
 }
 
@@ -12,7 +12,7 @@ export type JsonManagerOptions = BaseManagerOptions & {
   ruleFile: string;
 };
 
-export class JsonManager extends BaseManager {
+export default class JsonManager extends BaseManager {
   /**
    * The path of the JSON file that contains the authorization items.
    */
@@ -48,10 +48,69 @@ export class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
+  public async load() {
+    this.log("JsonManager: Loading RBAC.");
+    this.invalidateRbac();
+
+    const items = JSON.parse(await fs.readFile(this.itemFile, "utf-8"));
+    const assignments = JSON.parse(await fs.readFile(this.assignmentFile, "utf-8"));
+    const rules = JSON.parse(await fs.readFile(this.ruleFile, "utf-8"));
+
+    Object.keys(items).forEach((name) => {
+      const item = items[name];
+      const ItemClass = item["type"] == ItemType.permission ? Permission : Role;
+      this.items.set(
+        name,
+        new ItemClass({
+          name,
+          description: item.description ?? null,
+          ruleName: item.ruleName ?? null,
+          // data: item.data ?? null,
+        })
+      );
+    });
+
+    Object.keys(items).forEach((name) => {
+      const item = items[name];
+      if (item.children.length > 0) {
+        item.children.forEach((childName: string) => {
+          if (this.items.has(childName)) {
+            if (this.parents.has(childName)) {
+              this.parents.get(childName)!.set(name, this.items.get(name)!);
+            } else {
+              this.parents.set(childName, new Map<string, IItem>([[name, this.items.get(name)!]]));
+            }
+          }
+        });
+      }
+    });
+
+    Object.keys(assignments).forEach((username) => {
+      const items: string[] = assignments[username];
+      items.forEach((itemName) => {
+        if (this.assignments.has(username)) {
+          this.assignments.get(username)?.set(itemName, new Assignment(username, itemName));
+        } else {
+          this.assignments.set(username, new Map([[itemName, new Assignment(username, itemName)]]));
+        }
+      });
+    });
+
+    Object.keys(rules).forEach((ruleName) => {
+      const ruleData = rules[ruleName];
+      const RuleClass = this.ruleClasses.get(ruleData.data.typeName) ?? Rule;
+      const rule = new RuleClass(ruleName, JSON.parse(ruleData.data.rule));
+      this.rules.set(rule.name, rule);
+    });
+  }
+
+  /**
+   * @inheritdoc
+   */
   public async getRolesByUser(username: string): Promise<Map<string, Role>> {
     const roles = this.getDefaultRoleInstances();
 
-    for (let [name, assignment] of await this.getAssignments(username)) {
+    for (const [name, assignment] of await this.getAssignments(username)) {
       const item = this.items.get(assignment.itemName);
       if (item?.type === ItemType.role) {
         roles.set(name, item);
@@ -75,7 +134,7 @@ export class JsonManager extends BaseManager {
     this.getChildrenRecursive(roleName, result);
 
     const roles: Map<string, Role> = new Map([[roleName, role]]);
-    (await this.getRoles()).forEach((role, name) => {
+    (await this.getRoles()).forEach((_role, name) => {
       if (result.includes(name)) {
         roles.set(name, role);
       }
@@ -96,8 +155,13 @@ export class JsonManager extends BaseManager {
 
     const permissions: Map<string, Permission> = new Map();
     result.forEach((itemName) => {
-      if (this.items.has(itemName) && this.items.get(itemName) instanceof Permission) {
-        permissions.set(itemName, this.items.get(itemName)!);
+      const item = this.items.get(itemName);
+      if (!item) {
+        return;
+      }
+
+      if (item instanceof Permission) {
+        permissions.set(itemName, item);
       }
     });
 
@@ -131,36 +195,42 @@ export class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  public async canAddChild(parent: Item, child: Item): Promise<boolean> {
+  public async canAddChild(parent: IItem, child: IItem): Promise<boolean> {
     return !this.detectLoop(parent, child);
   }
 
   /**
    * @inheritdoc
    */
-  public async addChild(parent: Item, child: Item): Promise<boolean> {
-    if (!this.items.has(parent.name) || !this.items.has(child.name)) {
+  public async addChild(parent: IItem, child: IItem): Promise<boolean> {
+    const parentItem = this.items.get(parent.name);
+    const childItem = this.items.get(child.name);
+
+    if (!parentItem || !childItem) {
       throw new Error(`Either '${parent.name}' or '${child.name}' does not exist.`);
     }
 
-    if (parent.name === child.name) {
-      throw new Error(`Cannot add '${parent.name}' as a child of itself.`);
+    if (parentItem.name === childItem.name) {
+      throw new Error(`Cannot add '${parentItem.name}' as a child of itself.`);
     }
-    if (parent instanceof Permission && child instanceof Role) {
+
+    if (parentItem instanceof Permission && childItem instanceof Role) {
       throw new Error("Cannot add a role as a child of a permission.");
     }
 
-    if (this.detectLoop(parent, child)) {
-      throw new Error(`Cannot add '${child.name}' as a child of '${parent.name}'. A loop has been detected.`);
-    }
-    if (this.parents.get(child.name)?.has(parent.name)) {
-      throw new Error(`The item '${parent.name}' already has a child '${child.name}'.`);
+    if (this.detectLoop(parentItem, childItem)) {
+      throw new Error(`Cannot add '${childItem.name}' as a child of '${parentItem.name}'. A loop has been detected.`);
     }
 
-    if (!this.parents.has(child.name)) {
-      this.parents.set(child.name, new Map([[parent.name, this.items.get(parent.name)!]]));
+    if (this.parents.get(childItem.name)?.has(parentItem.name)) {
+      throw new Error(`The item '${parentItem.name}' already has a child '${childItem.name}'.`);
+    }
+
+    const item = this.parents.get(childItem.name);
+    if (!item) {
+      this.parents.set(childItem.name, new Map([[parentItem.name, parentItem]]));
     } else {
-      this.parents.get(child.name)!.set(parent.name, this.items.get(parent.name)!);
+      item.set(parentItem.name, parentItem);
     }
 
     await this.saveItems();
@@ -171,7 +241,7 @@ export class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  public async removeChild(parent: Item, child: Item): Promise<boolean> {
+  public async removeChild(parent: IItem, child: IItem): Promise<boolean> {
     if (!this.parents.get(child.name)?.has(parent.name)) {
       return false;
     }
@@ -184,7 +254,7 @@ export class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  public async removeChildren(parent: Item): Promise<boolean> {
+  public async removeChildren(parent: IItem): Promise<boolean> {
     let result = false;
     this.parents.forEach((parents) => {
       result = result || parents.delete(parent.name);
@@ -198,14 +268,14 @@ export class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  public async hasChild(parent: Item, child: Item): Promise<boolean> {
+  public async hasChild(parent: IItem, child: IItem): Promise<boolean> {
     return this.parents.get(child.name)?.has(parent.name) ?? false;
   }
 
   /**
    * @inheritdoc
    */
-  public async getChildren(parentName: string): Promise<Map<string, Item>> {
+  public async getChildren(parentName: string): Promise<Map<string, IItem>> {
     const children = new Map();
     this.parents.forEach((parents, childName) => {
       if (parents.has(parentName)) {
@@ -225,15 +295,13 @@ export class JsonManager extends BaseManager {
       throw new Error(`Authorization item '${role.name}' has already been assigned to user '${username}'.`);
     }
 
-    const assignment = new Assignment({
-      username: username,
-      itemName: role.name,
-    });
+    const assignment = new Assignment(username, role.name);
 
-    if (!this.assignments.has(username)) {
+    const userAssignments = this.assignments.get(username);
+    if (!userAssignments) {
       this.assignments.set(username, new Map([[role.name, assignment]]));
     } else {
-      this.assignments.get(username)!.set(role.name, assignment);
+      userAssignments.set(role.name, assignment);
     }
 
     await this.saveAssignments();
@@ -287,8 +355,8 @@ export class JsonManager extends BaseManager {
    */
   public async getUsernamesByRole(roleName: string): Promise<string[]> {
     const result: string[] = [];
-    for (let [username, assignments] of this.assignments) {
-      for (let userAssignment of assignments.values()) {
+    for (const [username, assignments] of this.assignments) {
+      for (const userAssignment of assignments.values()) {
         if (userAssignment.itemName === roleName && userAssignment.username === username) {
           result.push(username);
         }
@@ -343,17 +411,17 @@ export class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  protected async getItem(name: string): Promise<Item | null> {
+  protected async getItem(name: string): Promise<IItem | null> {
     return this.items.get(name) ?? null;
   }
 
   /**
    * @inheritdoc
    */
-  protected async getItems(type: ItemType): Promise<Map<string, Item>> {
+  protected async getItems(type: ItemType): Promise<Map<string, IItem>> {
     const items = new Map();
 
-    for (let [name, item] of this.items) {
+    for (const [name, item] of this.items) {
       if (item.type === type) {
         items.set(name, item);
       }
@@ -365,7 +433,7 @@ export class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  protected async addItem(item: Item): Promise<boolean> {
+  protected async addItem(item: IItem): Promise<boolean> {
     this.items.set(item.name, item);
     await this.saveItems();
     return true;
@@ -383,7 +451,7 @@ export class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  protected async removeItem(item: Item): Promise<boolean> {
+  protected async removeItem(item: IItem): Promise<boolean> {
     if (!this.items.has(item.name)) {
       return false;
     }
@@ -422,7 +490,7 @@ export class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  protected async updateItem(name: string, item: Item): Promise<boolean> {
+  protected async updateItem(name: string, item: IItem): Promise<boolean> {
     if (name !== item.name) {
       if (this.items.has(item.name)) {
         throw new Error(`Unable to change the item name. The name '${item.name}' is already used by another item.`);
@@ -431,13 +499,15 @@ export class JsonManager extends BaseManager {
       // Remove old item in case of renaming
       this.items.delete(name);
 
-      if (this.parents.has(name)) {
-        this.parents.set(item.name, this.parents.get(name)!);
+      const parent = this.parents.get(name);
+      if (parent) {
+        this.parents.set(item.name, parent);
         this.parents.delete(name);
       }
       this.parents.forEach((parents) => {
-        if (parents.has(name)) {
-          parents.set(item.name, parents.get(name)!);
+        const _parent = parents.get(name);
+        if (_parent) {
+          parents.set(item.name, _parent);
           parents.delete(name);
         }
       });
@@ -477,87 +547,6 @@ export class JsonManager extends BaseManager {
     return true;
   }
 
-  /**
-   * @inheritdoc
-   */
-  protected async load() {
-    this.log("JsonManager: Loading RBAC.");
-    this.invalidateRbac();
-
-    const items = JSON.parse(await fs.readFile(this.itemFile, "utf-8"));
-    // $itemsMtime = @filemtime($this->itemFile);
-    const assignments = JSON.parse(await fs.readFile(this.assignmentFile, "utf-8"));
-    // $assignmentsMtime = @filemtime($this->assignmentFile);
-    const rules = JSON.parse(await fs.readFile(this.ruleFile, "utf-8"));
-
-    Object.keys(items).forEach((name) => {
-      const item = items[name];
-      const ItemClass = item["type"] == ItemType.permission ? Permission : Role;
-      this.items.set(
-        name,
-        new ItemClass({
-          name,
-          description: item.description ?? null,
-          ruleName: item.ruleName ?? null,
-          // data: item.data ?? null,
-        })
-      );
-    });
-
-    Object.keys(items).forEach((name) => {
-      const item = items[name];
-      if (item.children.length > 0) {
-        item.children.forEach((childName: string) => {
-          if (this.items.has(childName)) {
-            if (this.parents.has(childName)) {
-              this.parents.get(childName)!.set(name, this.items.get(name)!);
-            } else {
-              this.parents.set(
-                childName,
-                new Map<string, Item>([[name, this.items.get(name)!]])
-              );
-            }
-          }
-        });
-      }
-    });
-
-    Object.keys(assignments).forEach((username) => {
-      const items: string[] = assignments[username];
-      items.forEach((itemName) => {
-        if (this.assignments.has(username)) {
-          this.assignments.get(username)?.set(
-            itemName,
-            new Assignment({
-              username,
-              itemName,
-            })
-          );
-        } else {
-          this.assignments.set(
-            username,
-            new Map([
-              [
-                itemName,
-                new Assignment({
-                  username,
-                  itemName,
-                }),
-              ],
-            ])
-          );
-        }
-      });
-    });
-
-    Object.keys(rules).forEach((ruleName) => {
-      const ruleData = rules[ruleName];
-      const RuleClass = this.ruleClasses.get(ruleData.data.typeName) ?? Rule;
-      const rule = new RuleClass(ruleName, JSON.parse(ruleData.data.rule));
-      this.rules.set(rule.name, rule);
-    });
-  }
-
   protected saveToFile(data: any, file: string): Promise<void> {
     return fs.writeFile(file, JSON.stringify(data, null, 2));
   }
@@ -585,7 +574,7 @@ export class JsonManager extends BaseManager {
         children: string[];
       };
     } = {};
-    for (let [itemName, item] of this.items) {
+    for (const [itemName, item] of this.items) {
       items[itemName] = {
         type: item.type,
         name: item.name,
@@ -597,7 +586,7 @@ export class JsonManager extends BaseManager {
 
       const children = await this.getChildren(itemName);
       if (children) {
-        for (let childName of children.keys()) {
+        for (const childName of children.keys()) {
           items[itemName].children.push(childName);
         }
       }
@@ -614,9 +603,9 @@ export class JsonManager extends BaseManager {
       [username: string]: string[];
     } = {};
 
-    for (let [username, userAssignments] of this.assignments) {
+    for (const [username, userAssignments] of this.assignments) {
       assignments[username] = [];
-      for (let assignment of userAssignments.values()) {
+      for (const assignment of userAssignments.values()) {
         assignments[username].push(assignment.itemName);
       }
     }
@@ -638,7 +627,7 @@ export class JsonManager extends BaseManager {
       };
     } = {};
 
-    for (let rule of this.rules.values()) {
+    for (const rule of this.rules.values()) {
       rules[rule.name] = {
         name: rule.name,
         data: {
@@ -658,7 +647,7 @@ export class JsonManager extends BaseManager {
    * @param {array} $result the children and grand children
    */
   protected getChildrenRecursive(name: string, result: string[]) {
-    for (let [childName, parents] of this.parents) {
+    for (const [childName, parents] of this.parents) {
       if (result.includes(childName) || !parents.has(name)) {
         continue;
       }
@@ -669,18 +658,18 @@ export class JsonManager extends BaseManager {
 
   /**
    * Checks whether there is a loop in the authorization item hierarchy.   *
-   * @param {Item} parent parent item
-   * @param {Item} child the child item that is to be added to the hierarchy
+   * @param {IItem} parent parent item
+   * @param {IItem} child the child item that is to be added to the hierarchy
    * @return {bool} whether a loop exists
    */
-  protected detectLoop(parent: Item, child: Item): boolean {
+  protected detectLoop(parent: IItem, child: IItem): boolean {
     if (parent.name === child.name) {
       return true;
     }
     if (!this.parents.has(parent.name) || !this.items.has(child.name)) {
       return false;
     }
-    for (let grandParent of this.parents.get(parent.name)!.values()) {
+    for (const grandParent of this.parents.get(parent.name)!.values()) {
       if (this.detectLoop(grandParent, child)) {
         return true;
       }
@@ -696,7 +685,7 @@ export class JsonManager extends BaseManager {
    */
   protected async getDirectPermissionsByUser(username: string): Promise<Map<string, Permission>> {
     const permissions = new Map();
-    for (let [name, assignment] of await this.getAssignments(username)) {
+    for (const [name, assignment] of await this.getAssignments(username)) {
       const permission = this.items.get(assignment.itemName)!;
       if (permission.type === ItemType.permission) {
         permissions.set(name, permission);
@@ -714,7 +703,7 @@ export class JsonManager extends BaseManager {
   protected async getInheritedPermissionsByUser(username: string): Promise<Map<string, Permission>> {
     const assignments = await this.getAssignments(username);
     const result: string[] = [];
-    for (let itemName of assignments.keys()) {
+    for (const itemName of assignments.keys()) {
       this.getChildrenRecursive(itemName, result);
     }
 
@@ -738,7 +727,7 @@ export class JsonManager extends BaseManager {
    */
   protected async removeAllItems(type: ItemType): Promise<void> {
     const names = [];
-    for (let [name, item] of this.items) {
+    for (const [name, item] of this.items) {
       if (item.type === type) {
         this.items.delete(name);
         names.push(name);
@@ -748,19 +737,19 @@ export class JsonManager extends BaseManager {
       return;
     }
 
-    for (let [username, assignments] of this.assignments) {
-      for (let [assignmentName, assignment] of assignments) {
+    for (const [username, assignments] of this.assignments) {
+      for (const [assignmentName, assignment] of assignments) {
         if (names.includes(assignment.itemName)) {
           this.assignments.get(username)?.delete(assignmentName);
         }
       }
     }
 
-    for (let [name, parents] of this.parents) {
+    for (const [name, parents] of this.parents) {
       if (names.includes(name)) {
         this.parents.delete(name);
       } else {
-        for (let [parentName, _item] of parents) {
+        for (const [parentName, _item] of parents) {
           if (names.includes(parentName)) {
             parents.delete(parentName);
           }

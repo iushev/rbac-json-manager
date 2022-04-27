@@ -1,1 +1,1 @@
-export { JsonManager, JsonManagerOptions } from "./JsonManager";
+export { default as JsonManager, JsonManagerOptions } from "./JsonManager";

@@ -1,0 +1,6 @@
+{
+  "reader": ["reader"],
+  "author A": ["author"],
+  "author B": ["author", "deletePost"],
+  "admin": ["admin"]
+}

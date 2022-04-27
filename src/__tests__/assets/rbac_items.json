@@ -2,14 +2,21 @@
   "createPost": {
     "type": "permission",
     "name": "createPost",
-    "description": "",
+    "description": "Create a post",
     "ruleName": null,
     "children": []
   },
   "readPost": {
     "type": "permission",
     "name": "readPost",
-    "description": "",
+    "description": "Read a post",
+    "ruleName": null,
+    "children": []
+  },
+  "deletePost": {
+    "type": "permission",
+    "name": "deletePost",
+    "description": "Delete a post",
     "ruleName": null,
     "children": []
   },
@@ -23,7 +30,7 @@
   "updateOwnPost": {
     "type": "permission",
     "name": "updateOwnPost",
-    "description": "",
+    "description": "Update own post",
     "ruleName": "isAuthor",
     "children": ["updatePost"]
   },
@@ -47,5 +54,12 @@
     "description": "",
     "ruleName": null,
     "children": ["author", "updatePost"]
+  },
+  "withoutChildren": {
+    "type": "role",
+    "name": "withoutChildren",
+    "description": "",
+    "ruleName": null,
+    "children": []
   }
 }
