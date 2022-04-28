@@ -16,7 +16,6 @@ export default class ActionRule extends Rule<ActionRuleData> {
    * @inheritdoc
    */
   public execute = async (_username: string, _item: IItem, params: RuleParams) => {
-    console.log("ActionRule.execute", { _username, params, data: this.data });
     return this.data.action === "all" || this.data.action === params["action"];
   };
 }
