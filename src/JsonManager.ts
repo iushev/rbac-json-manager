@@ -74,11 +74,16 @@ export default class JsonManager extends BaseManager {
       const item = items[name];
       if (item.children.length > 0) {
         item.children.forEach((childName: string) => {
-          if (this.items.has(childName)) {
-            if (this.parents.has(childName)) {
-              this.parents.get(childName)!.set(name, this.items.get(name)!);
+          const child = this.items.get(childName);
+          if (child) {
+            const parent = this.parents.get(childName);
+            if (parent) {
+              parent.set(name, child);
             } else {
-              this.parents.set(childName, new Map<string, IItem>([[name, this.items.get(name)!]]));
+              const item = this.items.get(name);
+              if (item) {
+                this.parents.set(childName, new Map<string, IItem>([[name, item]]));
+              }
             }
           }
         });
@@ -512,9 +517,10 @@ export default class JsonManager extends BaseManager {
         }
       });
       this.assignments.forEach((assignments) => {
-        if (assignments.has(name)) {
-          assignments.set(item.name, assignments.get(name)!);
-          assignments.get(item.name)!.itemName = item.name;
+        const assignment = assignments.get(name);
+        if (assignment) {
+          assignments.set(item.name, assignment);
+          assignment.itemName = item.name;
           assignments.delete(name);
         }
       });
@@ -669,7 +675,7 @@ export default class JsonManager extends BaseManager {
     if (!this.parents.has(parent.name) || !this.items.has(child.name)) {
       return false;
     }
-    for (const grandParent of this.parents.get(parent.name)!.values()) {
+    for (const grandParent of this.parents.get(parent.name)?.values() ?? []) {
       if (this.detectLoop(grandParent, child)) {
         return true;
       }
@@ -686,7 +692,10 @@ export default class JsonManager extends BaseManager {
   protected async getDirectPermissionsByUser(username: string): Promise<Map<string, Permission>> {
     const permissions = new Map();
     for (const [name, assignment] of await this.getAssignments(username)) {
-      const permission = this.items.get(assignment.itemName)!;
+      const permission = this.items.get(assignment.itemName);
+      if (!permission) {
+        continue;
+      }
       if (permission.type === ItemType.permission) {
         permissions.set(name, permission);
       }
@@ -713,8 +722,9 @@ export default class JsonManager extends BaseManager {
 
     const permissions = new Map();
     result.forEach((itemName) => {
-      if (this.items.has(itemName) && this.items.get(itemName) instanceof Permission) {
-        permissions.set(itemName, this.items.get(itemName)!);
+      const permission = this.items.get(itemName);
+      if (permission && permission instanceof Permission) {
+        permissions.set(itemName, permission);
       }
     });
 
@@ -749,7 +759,7 @@ export default class JsonManager extends BaseManager {
       if (names.includes(name)) {
         this.parents.delete(name);
       } else {
-        for (const [parentName, _item] of parents) {
+        for (const [parentName] of parents) {
           if (names.includes(parentName)) {
             parents.delete(parentName);
           }
