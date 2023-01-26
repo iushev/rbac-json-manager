@@ -411,14 +411,14 @@ export default class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  protected async getItem(name: string): Promise<IItem | null> {
+  public async getItem(name: string): Promise<IItem | null> {
     return this.items.get(name) ?? null;
   }
 
   /**
    * @inheritdoc
    */
-  protected async getItems(type: ItemType): Promise<Map<string, IItem>> {
+  public async getItems(type: ItemType): Promise<Map<string, IItem>> {
     const items = new Map();
 
     for (const [name, item] of this.items) {
@@ -433,7 +433,7 @@ export default class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  protected async addItem(item: IItem): Promise<boolean> {
+  public async addItem(item: IItem): Promise<boolean> {
     this.items.set(item.name, item);
     await this.saveItems();
     return true;
@@ -442,7 +442,7 @@ export default class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  protected async addRule(rule: Rule): Promise<boolean> {
+  public async addRule(rule: Rule): Promise<boolean> {
     this.rules.set(rule.name, rule);
     await this.saveRules();
     return true;
@@ -451,7 +451,7 @@ export default class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  protected async removeItem(item: IItem): Promise<boolean> {
+  public async removeItem(item: IItem): Promise<boolean> {
     if (!this.items.has(item.name)) {
       return false;
     }
@@ -470,7 +470,7 @@ export default class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  protected async removeRule(rule: Rule): Promise<boolean> {
+  public async removeRule(rule: Rule): Promise<boolean> {
     if (!this.rules.has(rule.name)) {
       return false;
     }
@@ -490,7 +490,7 @@ export default class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  protected async updateItem(name: string, item: IItem): Promise<boolean> {
+  public async updateItem(name: string, item: IItem): Promise<boolean> {
     if (name !== item.name) {
       if (this.items.has(item.name)) {
         throw new Error(`Unable to change the item name. The name '${item.name}' is already used by another item.`);
@@ -530,7 +530,7 @@ export default class JsonManager extends BaseManager {
   /**
    * @inheritdoc
    */
-  protected async updateRule(name: string, rule: Rule): Promise<boolean> {
+  public async updateRule(name: string, rule: Rule): Promise<boolean> {
     if (rule.name !== name) {
       this.rules.delete(name);
     }

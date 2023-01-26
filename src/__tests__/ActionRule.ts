@@ -1,8 +1,8 @@
 import { IItem, Rule, RuleParams } from "@iushev/rbac";
 
-export interface ActionRuleData {
+export type ActionRuleData = {
   action: string;
-}
+};
 
 export default class ActionRule extends Rule<ActionRuleData> {
   constructor(name = "action_rule", data?: ActionRuleData) {

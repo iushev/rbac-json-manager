@@ -1,8 +1,8 @@
 import { IItem, Rule, RuleParams } from "@iushev/rbac";
 
-export interface AuthorRuleData {
+export type AuthorRuleData = {
   reallyReally: boolean;
-}
+};
 
 export default class AuthorRule extends Rule<AuthorRuleData> {
   constructor(name = "isAuthor", data?: AuthorRuleData) {
