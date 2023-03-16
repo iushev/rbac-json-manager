@@ -65,7 +65,7 @@ export default class JsonManager extends BaseManager {
           name,
           description: item.description ?? null,
           ruleName: item.ruleName ?? null,
-          // data: item.data ?? null,
+          data: item.data ?? null,
         })
       );
     });
@@ -649,8 +649,8 @@ export default class JsonManager extends BaseManager {
   /**
    * Recursively finds all children and grand children of the specified item.
    *
-   * @param {string} $name the name of the item whose children are to be looked for.
-   * @param {array} $result the children and grand children
+   * @param {string} name the name of the item whose children are to be looked for.
+   * @param {array} result the children and grand children
    */
   protected getChildrenRecursive(name: string, result: string[]) {
     for (const [childName, parents] of this.parents) {
