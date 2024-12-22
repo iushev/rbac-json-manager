@@ -66,7 +66,7 @@ export default class JsonManager extends BaseManager {
           description: item.description ?? null,
           ruleName: item.ruleName ?? null,
           data: item.data ?? null,
-        })
+        }),
       );
     });
 

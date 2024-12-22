@@ -71,7 +71,7 @@ describe("Testing JsonManager", () => {
       fs.copyFileSync(path.join(__dirname, "/assets/rbac_items.json"), path.join(__dirname, "/assets/rbacItems.json"));
       fs.copyFileSync(
         path.join(__dirname, "/assets/rbac_assignments.json"),
-        path.join(__dirname, "/assets/rbacAssignments.json")
+        path.join(__dirname, "/assets/rbacAssignments.json"),
       );
       fs.copyFileSync(path.join(__dirname, "/assets/rbac_rules.json"), path.join(__dirname, "/assets/rbacRules.json"));
 
