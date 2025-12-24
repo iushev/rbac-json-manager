@@ -334,7 +334,7 @@ describe("Testing JsonManager", () => {
       let item = createRBACItem(itemType, "Admin");
       await auth.add(item);
       await auth.assign(item, username);
-      expect(await auth.checkAccess(username, "Admin", {})).toBe(true);
+      expect(await auth.checkAccess({ username, itemName: "Admin", params: {} })).toBe(true);
 
       // with normal register rule
       await auth.removeAll();
@@ -344,8 +344,8 @@ describe("Testing JsonManager", () => {
       item.ruleName = rule.name;
       await auth.add(item);
       await auth.assign(item, username);
-      expect(await auth.checkAccess(username, "Reader", { action: "read" })).toBe(true);
-      expect(await auth.checkAccess(username, "Reader", { action: "write" })).toBe(false);
+      expect(await auth.checkAccess({ username, itemName: "Reader", params: { action: "read" } })).toBe(true);
+      expect(await auth.checkAccess({ username, itemName: "Reader", params: { action: "write" } })).toBe(false);
 
       // update role and rule
       const allRule = new ActionRule();
@@ -356,7 +356,7 @@ describe("Testing JsonManager", () => {
       item.name = "AdminPost";
       item.ruleName = "all_rule";
       await auth.update("Reader", item);
-      expect(await auth.checkAccess(username, "AdminPost", { action: "print" })).toBe(true);
+      expect(await auth.checkAccess({ username, itemName: "AdminPost", params: { action: "print" } })).toBe(true);
     }
 
     test("Revoke rule from role", async () => {
@@ -375,7 +375,7 @@ describe("Testing JsonManager", () => {
       await auth.add(item);
       await auth.assign(item, username);
       expect(await auth.revoke(item, username)).toBe(true);
-      expect(await auth.checkAccess(username, "Admin", {})).toBe(false);
+      expect(await auth.checkAccess({ username, itemName: "Admin", params: {} })).toBe(false);
 
       await auth.removeAll();
       const rule = new ActionRule();
@@ -385,8 +385,8 @@ describe("Testing JsonManager", () => {
       await auth.add(item);
       await auth.assign(item, username);
       expect(await auth.revoke(item, username)).toBe(true);
-      expect(await auth.checkAccess(username, "Reader", { action: "read" })).toBe(false);
-      expect(await auth.checkAccess(username, "Reader", { action: "write" })).toBe(false);
+      expect(await auth.checkAccess({ username, itemName: "Reader", params: { action: "read" } })).toBe(false);
+      expect(await auth.checkAccess({ username, itemName: "Reader", params: { action: "write" } })).toBe(false);
     }
 
     /**

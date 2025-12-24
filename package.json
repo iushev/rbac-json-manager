@@ -32,7 +32,7 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
-    "@iushev/rbac": "^1.0.54"
+    "@iushev/rbac": "^1.0.55"
   },
   "publishConfig": {
     "access": "public"
