@@ -1,6 +1,6 @@
 {
   "name": "@iushev/rbac-json-manager",
-  "version": "1.0.44",
+  "version": "1.0.45",
   "private": false,
   "author": "Ivaylo Ushev",
   "description": "RBAC JSON Manager",
