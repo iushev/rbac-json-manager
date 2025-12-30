@@ -49,7 +49,6 @@ export default class JsonManager extends BaseManager {
    * @inheritdoc
    */
   public async load() {
-    this.log("JsonManager: Loading RBAC.");
     this.invalidateRbac();
 
     const items = JSON.parse(await fs.readFile(this.itemFile, "utf-8"));
