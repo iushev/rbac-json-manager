@@ -102,7 +102,10 @@ export default class JsonManager extends BaseManager {
 
     Object.keys(rules).forEach((ruleName) => {
       const ruleData = rules[ruleName];
-      const RuleClass = this.ruleClasses.get(ruleData.data.typeName) ?? Rule;
+      const RuleClass = this.ruleClasses.get(ruleData.data.typeName);
+      if (!RuleClass) {
+        throw new Error(`Unknown rule type: ${ruleData.data.typeName}`);
+      }
       const rule = new RuleClass(ruleName, JSON.parse(ruleData.data.rule));
       this.rules.set(rule.name, rule);
     });
